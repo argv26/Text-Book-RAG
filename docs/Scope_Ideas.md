@@ -1,0 +1,2 @@
+- Make parsing the text-book an agentic workflow
+- store the images of the text book in S3

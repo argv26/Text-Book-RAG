@@ -1,0 +1,33 @@
+# --- Textbooks (large, copyrighted) ---
+text-books/*
+!text-books/.gitkeep
+
+# --- Analysis folder: ignore everything ---
+analysis-result/
+
+# Safety net for stray PDFs
+*.pdf
+
+# Pipeline intermediate files (regenerable)
+output/
+*.jsonl
+
+# --- Secrets and config ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- Editors and OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+docs/Intial-design-hld-daigram.excalidraw
