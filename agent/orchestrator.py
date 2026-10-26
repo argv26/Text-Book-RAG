@@ -419,16 +419,60 @@ Based on the indexed medical textbooks, here is the synthesis regarding **{user_
             role = "user" if m["role"] == "user" else "model"
             contents.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
 
-        res = client.models.generate_content(
-            model=model,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
-                tools=tools,
-            ),
-        )
+        max_iterations = 5
+        final_reply = ""
 
-        final_reply = res.text or ""
+        for _ in range(max_iterations):
+            res = client.models.generate_content(
+                model=model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                    tools=tools,
+                ),
+            )
+
+            # If no function calls, we have our final text answer
+            if not res.function_calls:
+                final_reply = res.text or ""
+                break
+
+            # Append the model's response parts to conversation history
+            if res.candidates and res.candidates[0].content:
+                contents.append(res.candidates[0].content)
+
+            # Execute tool calls and create function response parts
+            response_parts = []
+            for fc in res.function_calls:
+                fn_name = fc.name
+                fn_args = dict(fc.args) if fc.args else {}
+                if book_slug and "book_slug" not in fn_args:
+                    fn_args["book_slug"] = book_slug
+
+                result = execute_tool(fn_name, fn_args)
+                tool_call_id = f"call_{uuid.uuid4().hex[:8]}"
+
+                self.context_manager.add_tool_result(
+                    session_id=session_id,
+                    tool_call_id=tool_call_id,
+                    name=fn_name,
+                    result=result,
+                )
+
+                num_hits = len(result) if isinstance(result, list) else 1
+                tool_activity.append({
+                    "name": fn_name,
+                    "args": fn_args,
+                    "summary": f"{fn_name} returned {num_hits} items"
+                })
+
+                response_parts.append(
+                    types.Part.from_function_response(name=fn_name, response={"result": result})
+                )
+
+            # Send function responses back to the model
+            contents.append(types.Content(role="user", parts=response_parts))
+
         clean_reply, follow_ups = self._parse_follow_ups(final_reply)
         self.context_manager.add_assistant_message(session_id, clean_reply)
 

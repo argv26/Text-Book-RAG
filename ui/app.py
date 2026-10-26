@@ -12,7 +12,7 @@ try:
 except ImportError:
     pass
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from agent.orchestrator import AgentOrchestrator
 from retrieval.tools import get_chunk, list_books
+from ui.rate_limiter import DailyRateLimiter
 
 HERE = Path(__file__).resolve().parent
 STATIC_DIR = HERE / "static"
@@ -40,6 +41,7 @@ app.add_middleware(
 )
 
 orchestrator = AgentOrchestrator()
+rate_limiter = DailyRateLimiter()
 
 
 class ChatRequest(BaseModel):
@@ -55,6 +57,15 @@ class ChatResponse(BaseModel):
     follow_ups: list[str]
 
 
+@app.get("/api/quota")
+def api_quota(request: Request, session_id: str | None = None):
+    """Returns today's usage and remaining request quota for the client."""
+    client_id = rate_limiter.get_client_id(request, session_id)
+    used, remaining = rate_limiter.get_remaining(client_id)
+    limit = int(os.environ.get("DAILY_REQUEST_LIMIT", "50"))
+    return {"limit": limit, "used": used, "remaining": remaining}
+
+
 @app.get("/api/books")
 def api_list_books():
     """Retrieve all available indexed textbooks and page statistics."""
@@ -66,10 +77,24 @@ def api_list_books():
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-def api_chat(req: ChatRequest):
+def api_chat(req: ChatRequest, request: Request, response: Response):
     """Processes a conversational turn with structure-aware tool retrieval and citations."""
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    client_id = rate_limiter.get_client_id(request, req.session_id)
+    allowed, used, remaining = rate_limiter.check_and_increment(client_id)
+    limit = int(os.environ.get("DAILY_REQUEST_LIMIT", "50"))
+
+    response.headers["X-RateLimit-Limit"] = str(limit)
+    response.headers["X-RateLimit-Remaining"] = str(remaining)
+
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Daily request limit reached ({limit}/{limit} queries used today). Quota resets at 00:00 UTC.",
+            headers={"Retry-After": "86400", "X-RateLimit-Remaining": "0"},
+        )
 
     try:
         res = orchestrator.run_turn(
@@ -78,6 +103,8 @@ def api_chat(req: ChatRequest):
             book_slug=req.book_slug,
         )
         return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error executing agent turn: {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error executing agent turn: {e}")
 

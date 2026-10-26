@@ -133,6 +133,7 @@ Text-Book-RAG/
 │
 ├── ui/                         # Web application
 │   ├── app.py                  # FastAPI server + REST API
+│   ├── rate_limiter.py         # Daily query quota enforcement (SQLite-backed)
 │   └── static/
 │       ├── index.html          # Single-page chat application
 │       ├── app.js              # Client-side logic
@@ -183,11 +184,22 @@ Text-Book-RAG/
 | `GEMINI_MODEL` | `gemini-2.5-flash` | Override Gemini model |
 | `OPENAI_MODEL` | `gpt-4o` | Override OpenAI model |
 | `DATABASE_URL` | *(none)* | PostgreSQL connection string; omit for SQLite |
+| `DAILY_REQUEST_LIMIT` | `50` | Maximum queries allowed per IP/day (0 for unlimited) |
 | `PORT` | `8000` | HTTP server port |
 
 ---
 
-## CLI Tools
+## Production Deployment
+
+The application is fully containerized and self-contained with a pre-indexed database:
+
+```bash
+# 1-command Docker deployment:
+docker compose up -d web
+# Access at http://localhost:8000
+```
+
+See [docs/deployment-guide.md](docs/deployment-guide.md) for complete instructions on deploying to **Google Cloud Run**, **Render**, **Railway**, or any Linux VPS.
 
 ```bash
 # Search textbook outline headings

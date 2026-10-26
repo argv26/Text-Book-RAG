@@ -43,14 +43,44 @@ const drawerContent = document.getElementById("drawer-content");
 const btnCloseDrawer = document.getElementById("btn-close-drawer");
 const btnToggleEvidence = document.getElementById("btn-toggle-evidence");
 const evidenceCountBadge = document.getElementById("evidence-count-badge");
+const quotaText = document.getElementById("quota-text");
 
 // Initialize application
 document.addEventListener("DOMContentLoaded", () => {
   setupMarkdown();
   fetchBooks();
+  fetchQuota();
   renderStarterPrompts();
   bindEvents();
 });
+
+async function fetchQuota() {
+  try {
+    const res = await fetch(`/api/quota?session_id=${sessionId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (quotaText) {
+        if (data.limit <= 0) {
+          quotaText.textContent = "Unlimited";
+        } else {
+          quotaText.textContent = `${data.remaining}/${data.limit} left`;
+          const container = quotaText.parentElement;
+          if (container) {
+            if (data.remaining === 0) {
+              container.className = "px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-xs font-medium text-rose-700 flex items-center gap-1.5 shadow-2xs";
+            } else if (data.remaining <= 5) {
+              container.className = "px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-xs font-medium text-amber-700 flex items-center gap-1.5 shadow-2xs";
+            } else {
+              container.className = "px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-medium text-slate-600 flex items-center gap-1.5 shadow-2xs";
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Quota fetch failed:", err);
+  }
+}
 
 function setupMarkdown() {
   if (window.marked) {
@@ -236,11 +266,16 @@ async function submitQuery(queryText) {
     });
 
     if (!res.ok) {
+      if (res.status === 429) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || "Daily request limit reached. Quota resets at 00:00 UTC.");
+      }
       throw new Error(`Server returned ${res.status}: ${res.statusText}`);
     }
 
     const data = await res.json();
     typingIndicator.remove();
+    fetchQuota();
 
     // Cache citations
     if (data.citations) {

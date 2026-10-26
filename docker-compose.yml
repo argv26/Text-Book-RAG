@@ -1,6 +1,26 @@
 version: '3.8'
 
 services:
+  # ─── Web Application (FastAPI + Agent + UI + Pre-indexed DB) ───────────────
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: textbook_rag_web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - DAILY_REQUEST_LIMIT=${DAILY_REQUEST_LIMIT:-50}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Uncomment to use PostgreSQL container instead of local SQLite:
+      # - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/textbook_rag
+    # depends_on:
+    #   - postgres
+
+  # ─── Optional PostgreSQL + pgvector (for multi-node production) ───────────
   postgres:
     image: pgvector/pgvector:pg16
     container_name: textbook_rag_postgres
@@ -17,4 +37,3 @@ services:
 
 volumes:
   postgres_data:
-
