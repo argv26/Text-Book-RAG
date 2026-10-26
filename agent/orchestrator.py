@@ -224,9 +224,17 @@ class AgentOrchestrator:
 
         # 2. Check for configured LLM or fallback to Smart Retrieval Synthesizer
         if self.gemini_api_key:
-            return self._run_gemini_turn(session_id, user_message, book_slug)
+            try:
+                return self._run_gemini_turn(session_id, user_message, book_slug)
+            except Exception as e:
+                print(f"[AgentOrchestrator] Gemini LLM unavailable ({e}). Falling back to local smart synthesizer.")
+                return self._run_offline_synthesizer_turn(session_id, user_message, book_slug)
         elif self.openai_api_key:
-            return self._run_openai_turn(session_id, user_message, book_slug)
+            try:
+                return self._run_openai_turn(session_id, user_message, book_slug)
+            except Exception as e:
+                print(f"[AgentOrchestrator] OpenAI LLM unavailable ({e}). Falling back to local smart synthesizer.")
+                return self._run_offline_synthesizer_turn(session_id, user_message, book_slug)
         else:
             return self._run_offline_synthesizer_turn(session_id, user_message, book_slug)
 
@@ -514,7 +522,7 @@ class AgentOrchestrator:
         from google.genai import types
 
         client = genai.Client(api_key=self.gemini_api_key)
-        model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+        model = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
         tool_activity: list[dict[str, Any]] = []
 
         # Build tools list for Gemini SDK
@@ -534,13 +542,20 @@ class AgentOrchestrator:
             system_prompt=SYSTEM_PROMPT,
         )
 
-        # Convert context messages to Gemini contents
+        # Convert context messages to Gemini contents with strict user/model alternation
         contents = []
         for m in messages:
             if m["role"] == "system":
                 continue
-            role = "user" if m["role"] == "user" else "model"
-            contents.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
+            role = "model" if m["role"] in ["assistant", "model"] else "user"
+            text_content = m["content"]
+            if m["role"] == "tool":
+                text_content = f"[Reference retrieved for {m.get('name', 'tool')}]:\n{text_content}"
+
+            if contents and contents[-1].role == role:
+                contents[-1].parts.append(types.Part.from_text(text=text_content))
+            else:
+                contents.append(types.Content(role=role, parts=[types.Part.from_text(text=text_content)]))
 
         max_iterations = 5
         final_reply = ""
