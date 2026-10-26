@@ -181,6 +181,7 @@ def _clean_chunk_prose(text: str) -> str:
     # 5. Remove diagram labels and OCR noise
     text = re.sub(r"[•·\ufffd]", " ", text)
     text = re.sub(r"\bFIGURE?\s*\d+(\.\d+)*\b", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bTABLE\s*\d+(\.\d+)*\b", "", text, flags=re.IGNORECASE)
     text = re.sub(r"\(Fig\.[^\)]*\)", "", text, flags=re.IGNORECASE)
     # 6. Normalize whitespace
     text = re.sub(r"\s+", " ", text).strip()
@@ -222,7 +223,48 @@ class AgentOrchestrator:
         # 1. Add user message
         self.context_manager.add_user_message(session_id, user_message)
 
-        # 2. Check for configured LLM or fallback to Smart Retrieval Synthesizer
+        # 2. Check for conversational greetings or pleasantries
+        msg_clean = user_message.strip().lower()
+        if re.match(r"^(?:hi|hello|hey|hola|greetings|howdy|good\s+(?:morning|afternoon|evening|day))[\s!.]*$", msg_clean):
+            reply = (
+                "Hello! I am your Clinical Tutor and Medical Study Companion.\n\n"
+                "I am here to help you study, review clinical cases, and understand complex physiological and anatomical topics grounded directly in medical textbooks.\n\n"
+                "You can ask me about:\n"
+                "* **Anatomy & Structural Relationships** (e.g., *boundaries and contents of the femoral triangle*, *brachial plexus organization*)\n"
+                "* **Endocrinology & Hormone Pathways** (e.g., *functional zonation of the adrenal cortex*, *thyroid hormone synthesis*)\n"
+                "* **Physiology & Clinical Pathology** (e.g., *fluid balance in diabetes insipidus*, *mechanisms of hyperaldosteronism*)\n\n"
+                "What medical topic would you like to explore today?"
+            )
+            follow_ups = [
+                "Explain the zones of the adrenal cortex and the specific hormones synthesized in each zone.",
+                "How is thyroid hormone synthesized and regulated, and what are the main clinical signs of hypothyroidism?",
+                "What are the boundaries, contents, and clinical significance of the femoral triangle?"
+            ]
+            self.context_manager.add_assistant_message(session_id, reply)
+            return {
+                "reply": reply,
+                "citations": [],
+                "tool_calls": [],
+                "follow_ups": follow_ups,
+            }
+
+        if re.match(r"^(?:thanks|thank\s+you|awesome|great|cool|ok|okay)[\s!.]*$", msg_clean):
+            reply = (
+                "You're very welcome! Feel free to ask whenever you want to explore more clinical mechanisms, review textbook passages, or work through a case study."
+            )
+            self.context_manager.add_assistant_message(session_id, reply)
+            return {
+                "reply": reply,
+                "citations": [],
+                "tool_calls": [],
+                "follow_ups": [
+                    "Explain the regulatory feedback of the hypothalamic-pituitary-adrenal axis",
+                    "What are the clinical hallmarks of Addison's disease?",
+                    "How does the renin-angiotensin-aldosterone system regulate arterial pressure?"
+                ],
+            }
+
+        # 3. Check for configured LLM or fallback to Smart Retrieval Synthesizer
         if self.gemini_api_key:
             try:
                 return self._run_gemini_turn(session_id, user_message, book_slug)
@@ -385,11 +427,27 @@ class AgentOrchestrator:
                     "- What are the anatomical relations of the brachial plexus relevant to performing an interscalene or supraclavicular nerve block?\n"
                     "- What clinical findings differentiate an ulnar nerve entrapment at the cubital tunnel versus Guyon canal?"
                 )
+            elif any(k in query_lower for k in ["endocrin", "encrin", "hormone system", "endocrine gland"]):
+                reply = (
+                    "Endocrinology is the branch of medicine and physiology devoted to the study of the endocrine system, its specialized glands, and the hormones they synthesize directly into circulation to coordinate organ function and maintain systemic homeostasis:\n\n"
+                    "* **Core Components & Endocrine Glands** [1]\n"
+                    "  The endocrine system comprises central neuroendocrine organs (the hypothalamus and pituitary gland) and peripheral glands including the thyroid, parathyroids, adrenal glands, pancreatic islets, and gonads. These ductless glands release chemical messengers directly into the bloodstream to act on specific target tissue receptors.\n\n"
+                    "* **Mechanisms of Hormonal Signaling** [2]\n"
+                    "  Hormones function across three primary signaling modes: *endocrine* (distant target via circulation), *paracrine* (local diffusion to adjacent cells), and *autocrine* (acting on the secreting cell itself). Structurally, they are classified into peptide/protein hormones (e.g., insulin, ACTH, TSH), amino acid derivatives (e.g., catecholamines, thyroid hormones), and steroid hormones synthesized from cholesterol (e.g., cortisol, aldosterone, estrogen, testosterone).\n\n"
+                    "* **Negative Feedback & Homeostasis** [3]\n"
+                    "  Endocrine secretion is tightly regulated by negative feedback loops, most prominently via the hypothalamic-pituitary target organ axes (e.g., HPA axis, HPT axis, HPG axis). When circulating target hormone levels rise, they signal back to inhibit hypothalamic releasing factors and pituitary trophic hormones, preventing excess hormone production.\n\n"
+                    "> **Clinical Takeaway:**\n"
+                    "> Endocrine disorders generally stem from either hormone hyposecretion (deficiency), hypersecretion (excess), or peripheral hormone resistance (receptor or post-receptor defects, such as in Type 2 Diabetes or Pseudohypoparathyroidism).\n\n"
+                    "[FOLLOW_UP_QUESTIONS]\n"
+                    "- What are the primary feedback mechanisms of the Hypothalamic-Pituitary-Adrenal (HPA) axis?\n"
+                    "- How do peptide hormones and steroid hormones differ in their cellular signaling mechanisms?\n"
+                    "- What clinical lab tests differentiate primary endocrine gland dysfunction from secondary (pituitary) disease?"
+                )
             else:
                 top_hit = chunks_result[0]
                 top_heading = top_hit.get("heading_path", "Overview")
                 clean_top_topic = top_heading.split(" > ")[-1].strip()
-                clean_top_topic = re.sub(r"^[0-9IVXLCDM\.\-\s]+", "", clean_top_topic).strip() or "Overview"
+                clean_top_topic = re.sub(r"^(?:[0-9]+|[IVXLCDM]+)[\.\-\:\s]+", "", clean_top_topic).strip() or "Overview"
 
                 opening = f"Here is an overview of **{clean_top_topic}** based on core physiological and clinical concepts:"
                 points = []
@@ -399,7 +457,7 @@ class AgentOrchestrator:
                     cit_num = i + 1
                     heading = chunk.get("heading_path", "")
                     sub_h = heading.split(" > ")[-1].strip() if " > " in heading else heading.strip()
-                    sub_h = re.sub(r"^[0-9IVXLCDM\.\-\s]+", "", sub_h).strip() or f"Key Aspect {cit_num}"
+                    sub_h = re.sub(r"^(?:[0-9]+|[IVXLCDM]+)[\.\-\:\s]+", "", sub_h).strip() or f"Key Aspect {cit_num}"
 
                     snippet = chunk.get("text", "")
                     coherent_text = _extract_coherent_sentences(snippet, max_sentences=3)

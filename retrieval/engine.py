@@ -95,13 +95,35 @@ class SqliteEngine(BaseEngine):
     STOP_WORDS = {
         "what", "is", "are", "the", "a", "an", "of", "and", "in", "to", "for", "with",
         "on", "at", "by", "from", "how", "does", "do", "explain", "describe", "tell",
-        "me", "about", "can", "you", "please", "specific", "each", "which", "give"
+        "me", "about", "can", "you", "please", "specific", "each", "which", "give",
+        "hi", "hello", "hey", "there"
     }
+
+    def _get_medical_vocabulary(self) -> set[str]:
+        if not hasattr(self, "_cached_vocab") or self._cached_vocab is None:
+            cur = self.conn.cursor()
+            paths = [r[0] for r in cur.execute("SELECT heading_path FROM sections").fetchall() if r[0]]
+            vocab = set()
+            for p in paths:
+                for w in re.findall(r"\b[a-zA-Z]{4,}\b", p.lower()):
+                    vocab.add(w)
+            self._cached_vocab = vocab
+        return self._cached_vocab
+
+    def _correct_spelling(self, word: str) -> str:
+        if len(word) < 4:
+            return word
+        vocab = self._get_medical_vocabulary()
+        if word.lower() in vocab:
+            return word
+        import difflib
+        matches = difflib.get_close_matches(word.lower(), vocab, n=1, cutoff=0.68)
+        return matches[0] if matches else word
 
     def _clean_fts_query(self, query: str, operator: str = "AND") -> str:
         words = [w for w in re.findall(r"\b\w+\b", query) if w]
         filtered = [w for w in words if w.lower() not in self.STOP_WORDS and len(w) > 1]
-        target = filtered if filtered else words
+        target = [self._correct_spelling(w) for w in (filtered if filtered else words)]
         return f" {operator} ".join(f'"{w}"' for w in target) if target else query
 
     def search_sections(self, query: str, book_slug: str | None = None, limit: int = 5) -> list[SectionHit]:
