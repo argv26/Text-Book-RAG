@@ -1,0 +1,20 @@
+# Text-Book-RAG Dependencies
+# Install with: pip install -r requirements.txt
+
+# ─── PDF Parsing ─────────────────────────────────────────────────────────────
+pymupdf>=1.24.0
+
+# ─── Database ────────────────────────────────────────────────────────────────
+psycopg[binary]>=3.2.0          # PostgreSQL driver (optional — for production)
+pgvector>=0.3.0                 # pgvector Python client (optional — for production)
+
+# ─── Web Framework ───────────────────────────────────────────────────────────
+fastapi>=0.115.0
+uvicorn>=0.30.0
+
+# ─── LLM SDKs (optional — app works offline without these) ──────────────────
+google-genai>=2.0.0             # Google Gemini
+openai>=1.40.0                  # OpenAI
+
+# ─── Environment Config ───────────────────────────────────────────────────────
+python-dotenv>=1.0.0

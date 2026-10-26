@@ -1,33 +1,46 @@
-# --- Textbooks (large, copyrighted) ---
-text-books/*
-!text-books/.gitkeep
+# ─── Textbooks (large, copyrighted — never commit PDFs) ─────────────────────
+ingestion/test-books/*
+!ingestion/test-books/.gitkeep
 
-# --- Analysis folder: ignore everything ---
-analysis-result/
-
-# Safety net for stray PDFs
+# ─── PDF safety net ──────────────────────────────────────────────────────────
 *.pdf
 
-# Pipeline intermediate files (regenerable)
-output/
+# ─── Intermediate Ingestion Outputs (regenerable via run_pipeline.py) ────────
+ingestion/output/
+ingestion/analysis-result/
 *.jsonl
 
-# --- Secrets and config ---
+# ─── Local Databases ─────────────────────────────────────────────────────────
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ─── Secrets and Environment Config ─────────────────────────────────────────
 .env
-.env.*
 !.env.example
 
-# --- Python ---
+# ─── Python ──────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
 .venv/
 venv/
+env/
 .pytest_cache/
 .ipynb_checkpoints/
+*.pyo
 
-# --- Editors and OS ---
+# ─── Editors and OS ──────────────────────────────────────────────────────────
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
-docs/Intial-design-hld-daigram.excalidraw
+desktop.ini
+
+# ─── Docker ──────────────────────────────────────────────────────────────────
+# Keep docker-compose.yml committed; ignore runtime volumes
+docker-data/
