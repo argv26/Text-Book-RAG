@@ -12,6 +12,7 @@ ingestion/analysis-result/
 
 # ─── Local Databases ─────────────────────────────────────────────────────────
 *.db
+!textbook_rag.db
 *.db-journal
 *.db-wal
 *.db-shm

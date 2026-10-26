@@ -1,3 +1,12 @@
+---
+title: TextBook RAG
+emoji: 📚
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+---
+
 # TextBook RAG
 
 A production-grade, structure-aware **Retrieval-Augmented Generation (RAG)** system for academic medical textbooks, with an interactive web chat interface.
