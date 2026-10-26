@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -66,7 +67,7 @@ class SqliteEngine(BaseEngine):
         self.db_path = Path(db_path)
         if not self.db_path.exists():
             raise FileNotFoundError(f"Database not found at {self.db_path}. Run ingestion/load_to_db.py first.")
-        self.conn = sqlite3.connect(str(self.db_path))
+        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False, timeout=15.0)
         self.conn.execute("PRAGMA journal_mode=WAL;")
         self.conn.execute("PRAGMA synchronous=NORMAL;")
         self._ensure_sections_fts()
@@ -91,13 +92,21 @@ class SqliteEngine(BaseEngine):
             )
             self.conn.commit()
 
-    def _clean_fts_query(self, query: str) -> str:
-        words = [w for w in query.replace('"', " ").replace("'", " ").split() if w]
-        return " AND ".join(f'"{w}"' for w in words) if words else query
+    STOP_WORDS = {
+        "what", "is", "are", "the", "a", "an", "of", "and", "in", "to", "for", "with",
+        "on", "at", "by", "from", "how", "does", "do", "explain", "describe", "tell",
+        "me", "about", "can", "you", "please", "specific", "each", "which", "give"
+    }
+
+    def _clean_fts_query(self, query: str, operator: str = "AND") -> str:
+        words = [w for w in re.findall(r"\b\w+\b", query) if w]
+        filtered = [w for w in words if w.lower() not in self.STOP_WORDS and len(w) > 1]
+        target = filtered if filtered else words
+        return f" {operator} ".join(f'"{w}"' for w in target) if target else query
 
     def search_sections(self, query: str, book_slug: str | None = None, limit: int = 5) -> list[SectionHit]:
         cur = self.conn.cursor()
-        fts_q = self._clean_fts_query(query)
+        fts_q = self._clean_fts_query(query, operator="AND")
 
         sql = """
             SELECT
@@ -117,6 +126,10 @@ class SqliteEngine(BaseEngine):
 
         try:
             rows = cur.execute(sql, params).fetchall()
+            if not rows:
+                fts_or = self._clean_fts_query(query, operator="OR")
+                if fts_or != fts_q:
+                    rows = cur.execute(sql, [fts_or] + params[1:]).fetchall()
         except sqlite3.OperationalError:
             # Fallback to simple LIKE if FTS expression has syntax quirks
             sql_fallback = """
@@ -185,6 +198,10 @@ class SqliteEngine(BaseEngine):
 
         try:
             rows = cur.execute(sql, params).fetchall()
+            if not rows:
+                fts_or = self._clean_fts_query(query, operator="OR")
+                if fts_or != fts_q:
+                    rows = cur.execute(sql, [fts_or] + params[1:]).fetchall()
         except sqlite3.OperationalError:
             # Fallback to text LIKE
             sql_fallback = """
