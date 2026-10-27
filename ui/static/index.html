@@ -191,31 +191,34 @@
     </div>
 
     <!-- Bottom Input Area -->
-    <div class="p-4 border-t border-slate-200 bg-white/95 backdrop-blur">
-      <div class="max-w-4xl mx-auto relative">
-        <form id="chat-form" class="relative flex items-end bg-white border border-slate-300 rounded-2xl p-2 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition shadow-md">
+    <div class="p-3 sm:p-4 border-t border-slate-200 bg-white/95 backdrop-blur">
+      <div class="max-w-3xl mx-auto relative">
+        <form id="chat-form" class="relative flex items-end bg-white border border-slate-300 rounded-2xl p-1.5 sm:p-2 transition shadow-sm">
           <textarea
             id="chat-input"
             rows="1"
-            placeholder="Ask anything about anatomy, physiology, or endocrinology... (Enter to send, Shift+Enter for newline)"
+            placeholder="Ask a medical question (e.g., adrenal zones, thyroid synthesis)..."
             aria-label="Clinical inquiry text input"
-            class="w-full bg-transparent text-sm text-slate-900 placeholder-slate-400 px-3 py-2 focus:outline-none resize-none max-h-40 min-h-[40px] leading-relaxed font-sans"
+            class="w-full bg-transparent text-sm text-slate-900 placeholder-slate-400 px-3 py-2.5 focus:outline-none resize-none max-h-40 min-h-[44px] leading-relaxed font-sans"
           ></textarea>
           <button
             type="submit"
             id="btn-send"
+            disabled
             aria-label="Send clinical inquiry"
-            class="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex-shrink-0 transition duration-150 disabled:opacity-40 disabled:cursor-not-allowed ml-2 shadow-sm active:scale-95 min-w-[40px] min-h-[40px] flex items-center justify-center"
+            class="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex-shrink-0 transition duration-150 disabled:opacity-35 disabled:cursor-not-allowed ml-1.5 shadow-sm active:scale-95 min-w-[42px] min-h-[42px] flex items-center justify-center"
           >
-            <!-- Send Arrow SVG -->
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+            <!-- Upward Send Arrow SVG -->
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="12" y1="19" x2="12" y2="5"></line>
+              <polyline points="5 12 12 5 19 12"></polyline>
             </svg>
           </button>
         </form>
-        <p class="text-[11px] text-center text-slate-500 mt-2 font-medium">
-          Verified medical textbook citations. Click on any <span class="text-blue-600 font-mono font-bold">[#]</span> citation pill to view the source passage in the Evidence Drawer.
-        </p>
+        <div class="flex items-center justify-between text-[11px] text-slate-500 mt-2 px-1">
+          <span class="truncate">Verified textbook citations. Click on any <span class="text-blue-600 font-mono font-bold">[#]</span> citation pill to view source evidence.</span>
+          <span class="hidden sm:inline font-mono text-[10px] text-slate-400 flex-shrink-0 ml-2">↵ Send &nbsp;•&nbsp; ⇧↵ Newline</span>
+        </div>
       </div>
     </div>
   </main>

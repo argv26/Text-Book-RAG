@@ -68,7 +68,14 @@ document.addEventListener("DOMContentLoaded", () => {
   fetchQuota();
   renderStarterPrompts();
   bindEvents();
+  updateSendButtonState();
 });
+
+function updateSendButtonState() {
+  if (!btnSend || !chatInput) return;
+  const hasText = chatInput.value.trim().length > 0;
+  btnSend.disabled = !hasText || isAwaitingResponse;
+}
 
 async function fetchQuota() {
   try {
@@ -192,10 +199,11 @@ function bindEvents() {
     }
   });
 
-  // Auto-resize input
+  // Auto-resize input & toggle send button state
   chatInput.addEventListener("input", () => {
     chatInput.style.height = "auto";
     chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + "px";
+    updateSendButtonState();
   });
 
   // Book select change
@@ -275,6 +283,7 @@ function resetSession() {
   heroWelcome.classList.remove("hidden");
   chatInput.value = "";
   chatInput.style.height = "auto";
+  updateSendButtonState();
   chatInput.focus();
 }
 
@@ -296,7 +305,7 @@ function updateEvidenceCount() {
 async function submitQuery(queryText) {
   if (isAwaitingResponse) return;
   isAwaitingResponse = true;
-  btnSend.disabled = true;
+  updateSendButtonState();
 
   // Close mobile sidebar if open
   closeSidebar();
@@ -310,6 +319,7 @@ async function submitQuery(queryText) {
   appendUserMessage(queryText);
   chatInput.value = "";
   chatInput.style.height = "auto";
+  updateSendButtonState();
 
   // Append typing indicator
   const typingIndicator = appendTypingIndicator();
@@ -355,7 +365,7 @@ async function submitQuery(queryText) {
     appendErrorMessage(err.message);
   } finally {
     isAwaitingResponse = false;
-    btnSend.disabled = false;
+    updateSendButtonState();
     chatInput.focus();
   }
 }
@@ -365,7 +375,7 @@ function appendUserMessage(text) {
   const wrapper = document.createElement("div");
   wrapper.className = "flex justify-end";
   wrapper.innerHTML = `
-    <div class="max-w-2xl bg-blue-600 text-white rounded-2xl rounded-tr-xs px-4 py-3 shadow-md text-sm leading-relaxed whitespace-pre-wrap font-sans">
+    <div class="max-w-2xl bg-blue-600 text-white rounded-2xl rounded-tr-none sm:rounded-tr-sm px-4 py-3 shadow-sm text-sm leading-relaxed whitespace-pre-wrap font-sans">
       ${escapeHtml(text)}
     </div>
   `;
@@ -380,7 +390,7 @@ function appendTypingIndicator() {
     <div class="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0 text-sm shadow-xs" aria-hidden="true">
       ${AVATAR_SVG}
     </div>
-    <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-xs px-4 py-3 shadow-sm flex items-center gap-2">
+    <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-none sm:rounded-tl-sm px-4 py-3 shadow-sm flex items-center gap-2">
       <div class="w-2 h-2 rounded-full bg-blue-500 animate-bounce"></div>
       <div class="w-2 h-2 rounded-full bg-blue-400 animate-bounce [animation-delay:0.2s]"></div>
       <div class="w-2 h-2 rounded-full bg-blue-300 animate-bounce [animation-delay:0.4s]"></div>
@@ -442,7 +452,7 @@ function appendAssistantMessage(data) {
     <div class="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0 text-sm shadow-xs" aria-hidden="true">
       ${AVATAR_SVG}
     </div>
-    <div class="flex-1 max-w-3xl bg-white border border-slate-200 rounded-2xl rounded-tl-xs px-5 py-4 shadow-sm space-y-2">
+    <div class="flex-1 max-w-3xl bg-white border border-slate-200 rounded-2xl rounded-tl-none sm:rounded-tl-sm px-5 py-4 shadow-sm space-y-2">
       ${toolsHtml}
       <div class="prose-custom">
         ${formattedHtml}

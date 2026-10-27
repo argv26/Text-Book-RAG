@@ -35,11 +35,38 @@
 /* 3. Accessible Focus Rings (SKILL-Ui Rule 1) */
 button:focus-visible,
 a:focus-visible,
-input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid var(--color-primary) !important;
-  outline-offset: 2px !important;
+input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Chat Input inside Chat Form: Focus is seamlessly delegated to the outer container card */
+#chat-input:focus,
+#chat-input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+/* Chat Form Focus elevation & smooth transitions */
+#chat-form {
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+#chat-form:focus-within {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12), var(--shadow-card) !important;
+}
+
+/* Send Button States */
+#btn-send {
+  transition: all 0.18s ease-in-out;
+}
+#btn-send:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none !important;
+  background-color: #94a3b8 !important;
 }
 
 /* 4. Custom Scrollbar */
@@ -135,6 +162,34 @@ textarea:focus-visible {
   background-color: #f8fafc;
   color: #0f172a;
   font-weight: 700;
+}
+
+/* Monospace Code & Formula Styling */
+.prose-custom code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 0.85em;
+  background-color: #f1f5f9;
+  color: #1e40af;
+  padding: 0.15rem 0.35rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid #e2e8f0;
+}
+.prose-custom pre {
+  background-color: #0f172a;
+  color: #f8fafc;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  margin: 0.85rem 0;
+  font-size: 0.825rem;
+  line-height: 1.5;
+}
+.prose-custom pre code {
+  background-color: transparent;
+  color: inherit;
+  padding: 0;
+  border: none;
+  font-size: inherit;
 }
 
 /* 6. Interactive Citation Badges (Touch target expanded via pseudo-element) */
