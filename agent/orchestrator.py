@@ -287,11 +287,37 @@ class AgentOrchestrator:
         book_slug: str | None = None,
     ) -> dict[str, Any]:
         """Intelligent, structure-aware retrieval and synthesis when running offline without LLM API keys."""
+        query = user_message.strip()
+
+        # Check for meta/bot queries before running full text search
+        meta_patterns = [
+            r"are\s+you\s+(?:using\s+)?(?:a\s+)?(?:google\s+)?(?:llm|ai|gpt|gemini|model|claude|robot|bot)",
+            r"who\s+(?:created|made|developed|built)\s+you",
+            r"what\s+(?:model|llm|ai)\s+are\s+you",
+            r"how\s+do\s+you\s+work",
+        ]
+        if any(re.search(p, query.lower()) for p in meta_patterns):
+            reply = (
+                "I am an AI Clinical Study Companion and Medical Tutor. "
+                "I am powered by Google Gemini and equipped with structure-aware retrieval tools to search and cite verified medical textbooks.\n\n"
+                "You can ask me questions about human anatomy, physiological mechanisms, endocrinology, and clinical diagnosis."
+            )
+            follow_ups = [
+                "Explain the zones of the adrenal cortex and the specific hormones synthesized in each zone.",
+                "How is thyroid hormone synthesized and regulated, and what are the main clinical signs of hypothyroidism?",
+                "What are the boundaries, contents, and clinical significance of the femoral triangle?"
+            ]
+            self.context_manager.add_assistant_message(session_id, reply)
+            return {
+                "reply": reply,
+                "citations": [],
+                "tool_calls": [],
+                "follow_ups": follow_ups,
+            }
+
         tool_activity: list[dict[str, Any]] = []
 
         # 1. Execute chunk retrieval
-        query = user_message.strip()
-        # Clean question punctuation for FTS5 search
         clean_query = re.sub(r"[^\w\s-]", " ", query).strip()
         search_args: dict[str, Any] = {"query": clean_query, "limit": 4}
         if book_slug:
@@ -580,7 +606,15 @@ class AgentOrchestrator:
         from google.genai import types
 
         client = genai.Client(api_key=self.gemini_api_key)
-        model = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
+        candidate_models = [
+            os.environ.get("GEMINI_MODEL", "gemini-flash-lite-latest"),
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite",
+            "gemini-3.5-flash",
+        ]
+        # De-duplicate while preserving order
+        seen_m = set()
+        models = [m for m in candidate_models if not (m in seen_m or seen_m.add(m))]
         tool_activity: list[dict[str, Any]] = []
 
         # Build tools list for Gemini SDK
@@ -617,57 +651,76 @@ class AgentOrchestrator:
 
         max_iterations = 5
         final_reply = ""
+        last_error = None
 
-        for _ in range(max_iterations):
-            res = client.models.generate_content(
-                model=model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_PROMPT,
-                    tools=tools,
-                ),
-            )
+        for model in models:
+            try:
+                working_contents = list(contents)
+                turn_tools = list(tool_activity)
+                model_reply = ""
 
-            # If no function calls, we have our final text answer
-            if not res.function_calls:
-                final_reply = res.text or ""
-                break
+                for _ in range(max_iterations):
+                    res = client.models.generate_content(
+                        model=model,
+                        contents=working_contents,
+                        config=types.GenerateContentConfig(
+                            system_instruction=SYSTEM_PROMPT,
+                            tools=tools,
+                        ),
+                    )
 
-            # Append the model's response parts to conversation history
-            if res.candidates and res.candidates[0].content:
-                contents.append(res.candidates[0].content)
+                    # If no function calls, we have our final text answer
+                    if not res.function_calls:
+                        model_reply = res.text or ""
+                        break
 
-            # Execute tool calls and create function response parts
-            response_parts = []
-            for fc in res.function_calls:
-                fn_name = fc.name
-                fn_args = dict(fc.args) if fc.args else {}
-                if book_slug and "book_slug" not in fn_args:
-                    fn_args["book_slug"] = book_slug
+                    # Append the model's response parts to conversation history
+                    if res.candidates and res.candidates[0].content:
+                        working_contents.append(res.candidates[0].content)
 
-                result = execute_tool(fn_name, fn_args)
-                tool_call_id = f"call_{uuid.uuid4().hex[:8]}"
+                    # Execute tool calls and create function response parts
+                    response_parts = []
+                    for fc in res.function_calls:
+                        fn_name = fc.name
+                        fn_args = dict(fc.args) if fc.args else {}
+                        if book_slug and "book_slug" not in fn_args:
+                            fn_args["book_slug"] = book_slug
 
-                self.context_manager.add_tool_result(
-                    session_id=session_id,
-                    tool_call_id=tool_call_id,
-                    name=fn_name,
-                    result=result,
-                )
+                        result = execute_tool(fn_name, fn_args)
+                        tool_call_id = f"call_{uuid.uuid4().hex[:8]}"
 
-                num_hits = len(result) if isinstance(result, list) else 1
-                tool_activity.append({
-                    "name": fn_name,
-                    "args": fn_args,
-                    "summary": f"{fn_name} returned {num_hits} items"
-                })
+                        self.context_manager.add_tool_result(
+                            session_id=session_id,
+                            tool_call_id=tool_call_id,
+                            name=fn_name,
+                            result=result,
+                        )
 
-                response_parts.append(
-                    types.Part.from_function_response(name=fn_name, response={"result": result})
-                )
+                        num_hits = len(result) if isinstance(result, list) else 1
+                        turn_tools.append({
+                            "name": fn_name,
+                            "args": fn_args,
+                            "summary": f"{fn_name} returned {num_hits} items"
+                        })
 
-            # Send function responses back to the model
-            contents.append(types.Content(role="user", parts=response_parts))
+                        response_parts.append(
+                            types.Part.from_function_response(name=fn_name, response={"result": result})
+                        )
+
+                    # Send function responses back to the model
+                    working_contents.append(types.Content(role="user", parts=response_parts))
+
+                if model_reply:
+                    final_reply = model_reply
+                    tool_activity = turn_tools
+                    break
+            except Exception as e:
+                print(f"[AgentOrchestrator] Model {model} failed ({e}). Trying next candidate...")
+                last_error = e
+                continue
+
+        if not final_reply:
+            raise RuntimeError(f"All Gemini models failed. Last error: {last_error}")
 
         clean_reply, follow_ups = self._parse_follow_ups(final_reply)
         self.context_manager.add_assistant_message(session_id, clean_reply)

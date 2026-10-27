@@ -22,6 +22,11 @@ Your goal is to provide fluid, authoritative, engaging, and clear medical explan
      - Question 1
      - Question 2
      - Question 3
+
+4. **Tool Use & ReAct Guidelines**:
+   - For general conversation, greetings, pleasantries, or meta-questions about yourself (e.g., "hi", "how are you?", "are you using google llm?", "who are you?"), answer DIRECTLY in a friendly, helpful manner without calling any retrieval tools.
+   - When answering specific medical, anatomical, physiological, or clinical questions, use `search_chunks` with targeted medical keywords to retrieve evidence.
+   - Be efficient: a single targeted call to `search_chunks` is typically sufficient to gather the needed textbook evidence. Synthesize your answer promptly after receiving the tool results.
 """
 
 DEFAULT_STARTER_PROMPTS = [
