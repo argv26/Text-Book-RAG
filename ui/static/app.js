@@ -1,4 +1,5 @@
-// Client application logic for TextBook RAG Web Interface (Light Theme)
+// Client application logic for TextBook RAG Web Interface
+// Adheres to SKILL-Ui (ui-ux-pro-max) Accessibility, Responsive Design, and SVG Icon Standards
 
 const STARTER_PROMPTS = [
   {
@@ -44,6 +45,21 @@ const btnCloseDrawer = document.getElementById("btn-close-drawer");
 const btnToggleEvidence = document.getElementById("btn-toggle-evidence");
 const evidenceCountBadge = document.getElementById("evidence-count-badge");
 const quotaText = document.getElementById("quota-text");
+
+// Responsive Mobile Sidebar Elements
+const appSidebar = document.getElementById("app-sidebar");
+const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+const btnMobileMenu = document.getElementById("btn-mobile-menu");
+const btnCloseSidebar = document.getElementById("btn-close-sidebar");
+
+// Stethoscope Avatar SVG (Standardized Clean Icon)
+const AVATAR_SVG = `
+  <svg class="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
+    <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/>
+    <circle cx="20" cy="10" r="2"/>
+  </svg>
+`;
 
 // Initialize application
 document.addEventListener("DOMContentLoaded", () => {
@@ -111,7 +127,7 @@ async function fetchBooks() {
         const card = document.createElement("div");
         card.className = "p-2.5 rounded-lg bg-slate-50 border border-slate-200 hover:border-slate-300 transition shadow-xs";
         card.innerHTML = `
-          <div class="font-semibold text-slate-800 truncate" title="${b.title}">${b.title}</div>
+          <div class="font-semibold text-slate-800 truncate" title="${escapeHtml(b.title)}">${escapeHtml(b.title)}</div>
           <div class="flex items-center justify-between text-[11px] text-slate-500 mt-1">
             <span>${b.total_pages.toLocaleString()} pages</span>
             <span class="text-blue-600 font-mono font-medium">Indexed</span>
@@ -134,20 +150,25 @@ function renderStarterPrompts() {
   STARTER_PROMPTS.forEach(p => {
     // Sidebar small prompt
     const btn = document.createElement("button");
-    btn.className = "w-full text-left p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-blue-300 text-xs font-medium text-slate-700 transition truncate shadow-2xs";
+    btn.className = "w-full text-left p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-blue-300 text-xs font-medium text-slate-700 transition truncate shadow-2xs active:scale-95";
     btn.textContent = p.label;
-    btn.addEventListener("click", () => submitQuery(p.query));
+    btn.addEventListener("click", () => {
+      closeSidebar();
+      submitQuery(p.query);
+    });
     starterPromptList.appendChild(btn);
 
     // Hero card
     const card = document.createElement("button");
-    card.className = "p-4 rounded-xl bg-white hover:bg-blue-50/40 border border-slate-200 hover:border-blue-300 text-left transition duration-200 group flex flex-col justify-between shadow-sm hover:shadow";
+    card.className = "p-4 rounded-xl bg-white hover:bg-blue-50/40 border border-slate-200 hover:border-blue-300 text-left transition duration-200 group flex flex-col justify-between shadow-sm hover:shadow active:scale-95";
     card.innerHTML = `
-      <div class="font-bold text-xs text-slate-800 group-hover:text-blue-600 transition">${p.label}</div>
-      <div class="text-[11px] text-slate-600 line-clamp-2 mt-1.5 leading-relaxed">${p.query}</div>
-      <div class="mt-3 text-[10px] text-blue-600 font-bold flex items-center gap-1">
+      <div class="font-bold text-xs text-slate-800 group-hover:text-blue-600 transition">${escapeHtml(p.label)}</div>
+      <div class="text-[11px] text-slate-600 line-clamp-2 mt-1.5 leading-relaxed">${escapeHtml(p.query)}</div>
+      <div class="mt-3 text-[10px] text-blue-600 font-bold flex items-center gap-1.5">
         <span>Ask question</span>
-        <span>→</span>
+        <svg class="w-3 h-3 transition group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
       </div>
     `;
     card.addEventListener("click", () => submitQuery(p.query));
@@ -184,13 +205,27 @@ function bindEvents() {
   });
 
   // New Chat
-  btnNewChat.addEventListener("click", resetSession);
+  btnNewChat.addEventListener("click", () => {
+    resetSession();
+    closeSidebar();
+  });
   window.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
       resetSession();
     }
   });
+
+  // Mobile sidebar handlers
+  if (btnMobileMenu) {
+    btnMobileMenu.addEventListener("click", openSidebar);
+  }
+  if (btnCloseSidebar) {
+    btnCloseSidebar.addEventListener("click", closeSidebar);
+  }
+  if (sidebarBackdrop) {
+    sidebarBackdrop.addEventListener("click", closeSidebar);
+  }
 
   // Drawer handlers
   btnCloseDrawer.addEventListener("click", closeDrawer);
@@ -203,9 +238,32 @@ function bindEvents() {
     }
   });
 
+  // Global ESC key to close any active drawer/modal
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeDrawer();
+    if (e.key === "Escape") {
+      closeDrawer();
+      closeSidebar();
+    }
   });
+}
+
+// Mobile sidebar controls
+function openSidebar() {
+  if (appSidebar) {
+    appSidebar.classList.remove("-translate-x-full");
+  }
+  if (sidebarBackdrop) {
+    sidebarBackdrop.classList.remove("opacity-0", "pointer-events-none");
+  }
+}
+
+function closeSidebar() {
+  if (appSidebar) {
+    appSidebar.classList.add("-translate-x-full");
+  }
+  if (sidebarBackdrop) {
+    sidebarBackdrop.classList.add("opacity-0", "pointer-events-none");
+  }
 }
 
 function resetSession() {
@@ -239,6 +297,9 @@ async function submitQuery(queryText) {
   if (isAwaitingResponse) return;
   isAwaitingResponse = true;
   btnSend.disabled = true;
+
+  // Close mobile sidebar if open
+  closeSidebar();
 
   // Hide hero if visible
   if (!heroWelcome.classList.contains("hidden")) {
@@ -316,8 +377,8 @@ function appendTypingIndicator() {
   const wrapper = document.createElement("div");
   wrapper.className = "flex items-start gap-3";
   wrapper.innerHTML = `
-    <div class="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0 text-sm shadow-xs">
-      🩺
+    <div class="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0 text-sm shadow-xs" aria-hidden="true">
+      ${AVATAR_SVG}
     </div>
     <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-xs px-4 py-3 shadow-sm flex items-center gap-2">
       <div class="w-2 h-2 rounded-full bg-blue-500 animate-bounce"></div>
@@ -339,20 +400,35 @@ function appendAssistantMessage(data) {
   let formattedHtml = window.marked ? marked.parse(data.reply) : data.reply;
   formattedHtml = formatCitationBadges(formattedHtml);
 
-  // Tool pills HTML
+  // Tool pills HTML with bolt SVG
   let toolsHtml = "";
   if (data.tool_calls && data.tool_calls.length > 0) {
     const pills = data.tool_calls.map(tc => {
-      return `<div class="tool-pill"><span>⚡</span><span>${escapeHtml(tc.summary || tc.name)}</span></div>`;
+      return `
+        <div class="tool-pill">
+          <svg class="w-3 h-3 text-amber-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+          <span>${escapeHtml(tc.summary || tc.name)}</span>
+        </div>
+      `;
     }).join("");
     toolsHtml = `<div class="flex flex-wrap gap-1.5 mb-3">${pills}</div>`;
   }
 
-  // Follow-up questions HTML
+  // Follow-up questions HTML with compass SVG
   let followUpsHtml = "";
   if (data.follow_ups && data.follow_ups.length > 0) {
     const chips = data.follow_ups.map(q => {
-      return `<button class="follow-up-chip" data-question="${escapeHtml(q)}"><span>✨</span><span>${escapeHtml(q)}</span></button>`;
+      return `
+        <button class="follow-up-chip" data-question="${escapeHtml(q)}" aria-label="Explore follow-up: ${escapeHtml(q)}">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+          </svg>
+          <span>${escapeHtml(q)}</span>
+        </button>
+      `;
     }).join("");
     followUpsHtml = `
       <div class="mt-4 pt-3 border-t border-slate-100">
@@ -363,8 +439,8 @@ function appendAssistantMessage(data) {
   }
 
   wrapper.innerHTML = `
-    <div class="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0 text-sm shadow-xs">
-      🩺
+    <div class="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0 text-sm shadow-xs" aria-hidden="true">
+      ${AVATAR_SVG}
     </div>
     <div class="flex-1 max-w-3xl bg-white border border-slate-200 rounded-2xl rounded-tl-xs px-5 py-4 shadow-sm space-y-2">
       ${toolsHtml}
@@ -398,7 +474,7 @@ function appendAssistantMessage(data) {
 // Replace [1], [2] in HTML with clickable badge buttons
 function formatCitationBadges(html) {
   return html.replace(/\[(\d+)\]/g, (match, p1) => {
-    return `<button type="button" class="citation-badge" data-cit="${p1}" title="Click to view citing evidence">[${p1}]</button>`;
+    return `<button type="button" class="citation-badge" data-cit="${p1}" aria-label="View citation source ${p1}" title="Click to view citing evidence">[${p1}]</button>`;
   });
 }
 
@@ -424,13 +500,13 @@ async function showCitationInDrawer(citId) {
         <span class="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-bold font-mono">
           Citation [${cit.citation_id}]
         </span>
-        <span class="text-slate-500 font-mono text-[11px]">${cit.chunk_id}</span>
+        <span class="text-slate-500 font-mono text-[11px]">${escapeHtml(cit.chunk_id)}</span>
       </div>
 
       <!-- Source Book -->
       <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
         <div class="text-[10px] uppercase font-bold text-slate-400 mb-1">Textbook Volume</div>
-        <div class="font-semibold text-slate-800">${bookName}</div>
+        <div class="font-semibold text-slate-800">${escapeHtml(bookName)}</div>
       </div>
 
       <!-- Hierarchy / Heading Path -->
@@ -447,7 +523,7 @@ async function showCitationInDrawer(citId) {
         </div>
         <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
           <div class="text-[10px] uppercase font-bold text-slate-400">Section ID</div>
-          <div class="text-sm font-bold text-slate-900 mt-0.5">#${cit.section_id}</div>
+          <div class="text-sm font-bold text-slate-900 mt-0.5">#${escapeHtml(String(cit.section_id))}</div>
         </div>
       </div>
 
@@ -468,7 +544,7 @@ async function showCitationInDrawer(citId) {
 
   // Fetch full chunk details from /api/chunk/{chunk_id}
   try {
-    const res = await fetch(`/api/chunk/${cit.chunk_id}`);
+    const res = await fetch(`/api/chunk/${encodeURIComponent(cit.chunk_id)}`);
     if (res.ok) {
       const chunkData = await res.json();
       const textEl = document.getElementById("drawer-chunk-text");
@@ -490,8 +566,13 @@ function appendErrorMessage(msg) {
   const wrapper = document.createElement("div");
   wrapper.className = "flex justify-center";
   wrapper.innerHTML = `
-    <div class="max-w-md bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl px-4 py-2.5 text-center font-medium shadow-xs">
-      ⚠️ ${escapeHtml(msg)}
+    <div class="max-w-md bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl px-4 py-2.5 text-center font-medium shadow-xs flex items-center gap-2">
+      <svg class="w-4 h-4 text-rose-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+      <span>${escapeHtml(msg)}</span>
     </div>
   `;
   messagesContainer.appendChild(wrapper);
@@ -506,5 +587,5 @@ function scrollToBottom() {
 
 function escapeHtml(str) {
   if (!str) return "";
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
