@@ -33,6 +33,7 @@ from ui.auth import (
     register_user,
 )
 from ui.rate_limiter import DailyRateLimiter
+from ui.diagrams import get_figure_image_path
 from ui.sessions import (
     create_session as create_consultation_session,
     delete_session as delete_consultation_session,
@@ -521,6 +522,19 @@ def api_get_chunk(chunk_id: str):
     if "text" in data and isinstance(data["text"], str):
         data["text"] = re.sub(r"(\b\w+)-\s*\n\s*(\w+\b)", r"\1\2", data["text"])
     return data
+
+
+@app.get("/api/figure/{chunk_id}/image")
+def api_get_figure_image(chunk_id: str):
+    """Serve high-resolution textbook figure or diagram image."""
+    img_path = get_figure_image_path(chunk_id)
+    if not img_path or not img_path.exists():
+        raise HTTPException(status_code=404, detail="Figure image not available for this chunk")
+    return FileResponse(
+        str(img_path),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @app.get("/api/session/{session_id}/citations")

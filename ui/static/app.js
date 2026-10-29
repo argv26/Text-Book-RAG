@@ -96,6 +96,14 @@ const btnAuthSubmit = document.getElementById("btn-auth-submit");
 const authSubmitLabel = document.getElementById("auth-submit-label");
 const authModalTitle = document.getElementById("auth-modal-title");
 
+// Figure Lightbox Elements
+const figureLightboxModal = document.getElementById("figure-lightbox-modal");
+const btnCloseLightbox = document.getElementById("btn-close-lightbox");
+const lightboxImg = document.getElementById("lightbox-img");
+const lightboxTitle = document.getElementById("lightbox-title");
+const lightboxPageBadge = document.getElementById("lightbox-page-badge");
+const lightboxCaption = document.getElementById("lightbox-caption");
+
 // Stethoscope Avatar SVG (Standardized Clean Icon)
 const AVATAR_SVG = `
   <svg class="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -616,6 +624,14 @@ function bindEvents() {
       e.preventDefault();
       resetSession();
     } else if (e.key === "Escape") {
+      if (figureLightboxModal && !figureLightboxModal.classList.contains("hidden")) {
+        closeLightbox();
+        return;
+      }
+      if (authModal && !authModal.classList.contains("hidden")) {
+        closeAuthModal();
+        return;
+      }
       if (isAwaitingResponse) {
         stopCurrentGeneration();
       }
@@ -625,6 +641,17 @@ function bindEvents() {
       }
     }
   });
+
+  if (btnCloseLightbox) {
+    btnCloseLightbox.addEventListener("click", closeLightbox);
+  }
+  if (figureLightboxModal) {
+    figureLightboxModal.addEventListener("click", (e) => {
+      if (e.target === figureLightboxModal) {
+        closeLightbox();
+      }
+    });
+  }
 
   // Mobile sidebar handlers
   if (btnMobileMenu) {
@@ -1234,20 +1261,32 @@ function appendFiguresToWrapper(wrapper, figures) {
     const figTitle = match && match[1].length < 60 ? match[1].trim() : `Figure ${idx + 1}`;
 
     return `
-      <div class="figure-card bg-slate-50 hover:bg-blue-50/50 border border-slate-200 hover:border-blue-300 rounded-xl p-3 cursor-pointer transition shadow-2xs group flex flex-col justify-between" data-fig-chunk="${escapeHtml(fig.chunk_id)}">
+      <div class="figure-card bg-white hover:bg-blue-50/40 border border-slate-200 hover:border-blue-300 rounded-xl p-3 cursor-pointer transition shadow-2xs group flex flex-col justify-between" data-fig-chunk="${escapeHtml(fig.chunk_id)}">
         <div>
-          <div class="flex items-start justify-between gap-2 mb-1.5">
-            <span class="font-bold text-[11px] text-blue-700 group-hover:text-blue-800 flex items-center gap-1">
-              <svg class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-              <span class="truncate">${escapeHtml(figTitle)}</span>
-            </span>
-            <span class="text-[10px] font-mono text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded flex-shrink-0">p. ${fig.page_start}</span>
+          <!-- Thumbnail Container -->
+          <div class="relative w-full h-36 bg-slate-50 border border-slate-100 rounded-lg overflow-hidden mb-2.5 flex items-center justify-center group-hover:border-blue-200 transition">
+            <img 
+              src="/api/figure/${encodeURIComponent(fig.chunk_id)}/image" 
+              alt="${escapeHtml(figTitle)}" 
+              class="w-full h-full object-contain p-1 transition-transform duration-200 group-hover:scale-105" 
+              loading="lazy" 
+              onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" 
+            />
+            <div class="hidden text-slate-400 text-xs flex flex-col items-center gap-1 p-2 text-center">
+              <svg class="w-6 h-6 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span class="text-[10px]">Textbook Diagram</span>
+            </div>
+            <span class="absolute bottom-1.5 right-1.5 bg-slate-900/70 text-white text-[9px] px-1.5 py-0.5 rounded backdrop-blur-xs font-mono">p. ${fig.page_start}</span>
           </div>
-          <p class="text-[11px] text-slate-600 line-clamp-2 leading-relaxed font-sans mb-2">${escapeHtml(cleanCaption)}</p>
+
+          <div class="flex items-center justify-between gap-1 mb-1">
+            <span class="font-bold text-[11px] text-slate-800 group-hover:text-blue-700 truncate">${escapeHtml(figTitle)}</span>
+          </div>
+          <p class="text-[11px] text-slate-500 line-clamp-2 leading-relaxed font-sans mb-1">${escapeHtml(cleanCaption)}</p>
         </div>
-        <div class="pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-400">
-          <span class="truncate max-w-[180px]">${escapeHtml(bookTitle)}</span>
-          <span class="text-blue-600 font-medium group-hover:underline flex items-center gap-0.5">Inspect &rarr;</span>
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+          <span class="truncate max-w-[150px]">${escapeHtml(bookTitle)}</span>
+          <span class="text-blue-600 font-semibold group-hover:underline flex items-center gap-0.5">Enlarge 🔍</span>
         </div>
       </div>
     `;
@@ -1266,9 +1305,10 @@ function appendFiguresToWrapper(wrapper, figures) {
   container.querySelectorAll(".figure-card").forEach(card => {
     card.addEventListener("click", () => {
       const chunkId = card.getAttribute("data-fig-chunk");
-      if (chunkId) showFigureInDrawer(chunkId);
+      if (chunkId) openLightboxForChunk(chunkId);
     });
   });
+}
 }
 
 function appendFollowUpsToWrapper(wrapper, followUps) {
@@ -1403,20 +1443,32 @@ function appendAssistantMessage(data) {
       const figTitle = match && match[1].length < 60 ? match[1].trim() : `Figure ${idx + 1}`;
 
       return `
-        <div class="figure-card bg-slate-50 hover:bg-blue-50/50 border border-slate-200 hover:border-blue-300 rounded-xl p-3 cursor-pointer transition shadow-2xs group flex flex-col justify-between" data-fig-chunk="${escapeHtml(fig.chunk_id)}">
+        <div class="figure-card bg-white hover:bg-blue-50/40 border border-slate-200 hover:border-blue-300 rounded-xl p-3 cursor-pointer transition shadow-2xs group flex flex-col justify-between" data-fig-chunk="${escapeHtml(fig.chunk_id)}">
           <div>
-            <div class="flex items-start justify-between gap-2 mb-1.5">
-              <span class="font-bold text-[11px] text-blue-700 group-hover:text-blue-800 flex items-center gap-1">
-                <svg class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                <span class="truncate">${escapeHtml(figTitle)}</span>
-              </span>
-              <span class="text-[10px] font-mono text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded flex-shrink-0">p. ${fig.page_start}</span>
+            <!-- Thumbnail Container -->
+            <div class="relative w-full h-36 bg-slate-50 border border-slate-100 rounded-lg overflow-hidden mb-2.5 flex items-center justify-center group-hover:border-blue-200 transition">
+              <img 
+                src="/api/figure/${encodeURIComponent(fig.chunk_id)}/image" 
+                alt="${escapeHtml(figTitle)}" 
+                class="w-full h-full object-contain p-1 transition-transform duration-200 group-hover:scale-105" 
+                loading="lazy" 
+                onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" 
+              />
+              <div class="hidden text-slate-400 text-xs flex flex-col items-center gap-1 p-2 text-center">
+                <svg class="w-6 h-6 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span class="text-[10px]">Textbook Diagram</span>
+              </div>
+              <span class="absolute bottom-1.5 right-1.5 bg-slate-900/70 text-white text-[9px] px-1.5 py-0.5 rounded backdrop-blur-xs font-mono">p. ${fig.page_start}</span>
             </div>
-            <p class="text-[11px] text-slate-600 line-clamp-2 leading-relaxed font-sans mb-2">${escapeHtml(cleanCaption)}</p>
+
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <span class="font-bold text-[11px] text-slate-800 group-hover:text-blue-700 truncate">${escapeHtml(figTitle)}</span>
+            </div>
+            <p class="text-[11px] text-slate-500 line-clamp-2 leading-relaxed font-sans mb-1">${escapeHtml(cleanCaption)}</p>
           </div>
-          <div class="pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-400">
-            <span class="truncate max-w-[180px]">${escapeHtml(bookTitle)}</span>
-            <span class="text-blue-600 font-medium group-hover:underline flex items-center gap-0.5">Inspect &rarr;</span>
+          <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+            <span class="truncate max-w-[150px]">${escapeHtml(bookTitle)}</span>
+            <span class="text-blue-600 font-semibold group-hover:underline flex items-center gap-0.5">Enlarge 🔍</span>
           </div>
         </div>
       `;
@@ -1463,7 +1515,7 @@ function appendAssistantMessage(data) {
   wrapper.querySelectorAll(".figure-card").forEach(card => {
     card.addEventListener("click", () => {
       const chunkId = card.getAttribute("data-fig-chunk");
-      if (chunkId) showFigureInDrawer(chunkId);
+      if (chunkId) openLightboxForChunk(chunkId);
     });
   });
 
@@ -1515,6 +1567,46 @@ async function renderMermaidDiagrams(container) {
   }
 }
 
+// Figure Lightbox Functions
+function openLightbox({ chunkId, title, page, caption }) {
+  if (!figureLightboxModal || !lightboxImg) return;
+  lightboxImg.src = `/api/figure/${encodeURIComponent(chunkId)}/image`;
+  if (lightboxTitle) lightboxTitle.textContent = title || "Textbook Diagram";
+  if (lightboxPageBadge) lightboxPageBadge.textContent = page ? `p. ${page}` : "";
+  if (lightboxCaption) lightboxCaption.textContent = caption || "";
+  figureLightboxModal.classList.remove("hidden");
+  document.body.classList.add("overflow-hidden");
+}
+
+function closeLightbox() {
+  if (!figureLightboxModal) return;
+  figureLightboxModal.classList.add("hidden");
+  if (lightboxImg) lightboxImg.src = "";
+  document.body.classList.remove("overflow-hidden");
+}
+
+async function openLightboxForChunk(chunkId) {
+  try {
+    const res = await fetch(`/api/chunk/${encodeURIComponent(chunkId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      const rawText = data.text || "";
+      const match = rawText.match(/^(FIGURE\s+[\d\.]+[\w\s–—\-:]*?)(?:\.|\n|$)/i);
+      const figTitle = match && match[1].length < 60 ? match[1].trim() : "Textbook Figure";
+      openLightbox({
+        chunkId,
+        title: figTitle,
+        page: data.page_start,
+        caption: rawText
+      });
+      return;
+    }
+  } catch (err) {
+    console.warn("Failed to fetch chunk details for lightbox:", err);
+  }
+  openLightbox({ chunkId, title: "Textbook Figure", page: "", caption: "" });
+}
+
 // Show textbook figure in Evidence Drawer
 async function showFigureInDrawer(chunkId) {
   drawerContent.innerHTML = `
@@ -1544,6 +1636,22 @@ async function showFigureInDrawer(chunkId) {
           <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-medium">
             Visual Illustration
           </span>
+        </div>
+
+        <!-- Textbook Figure Image Preview -->
+        <div class="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+          <div class="flex items-center justify-between text-[11px] font-bold text-slate-700 px-1 mb-1.5">
+            <span class="flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span>Textbook Diagram</span>
+            </span>
+            <button type="button" class="text-blue-600 hover:text-blue-800 text-[10px] font-semibold cursor-pointer flex items-center gap-0.5" onclick="openLightboxForChunk('${escapeHtml(chunkId)}')">
+              <span>Enlarge</span> &nearr;
+            </button>
+          </div>
+          <div class="relative bg-slate-950/5 rounded-lg overflow-hidden flex items-center justify-center p-1 min-h-[140px] cursor-zoom-in" onclick="openLightboxForChunk('${escapeHtml(chunkId)}')">
+            <img src="/api/figure/${encodeURIComponent(chunkId)}/image" alt="Textbook Figure Visual" class="w-full max-h-60 object-contain rounded transition hover:scale-102" loading="lazy" onerror="this.parentElement.parentElement.remove();" />
+          </div>
         </div>
 
         <!-- Source Book -->
@@ -1667,7 +1775,7 @@ async function showCitationInDrawer(citId) {
       </div>
 
       <!-- Passage Text -->
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+      <div id="drawer-passage-box" class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-2">
         <div class="flex items-center justify-between text-[10px] uppercase font-bold text-slate-400">
           <span>Verified Passage Excerpt</span>
           <span id="drawer-chunk-type" class="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-semibold text-[10px]">VERIFIED EXCERPT</span>
@@ -1694,6 +1802,31 @@ async function showCitationInDrawer(citId) {
       }
       if (typeEl && chunkData.content_type) {
         typeEl.textContent = chunkData.content_type.toUpperCase();
+      }
+
+      // If chunk is a figure or diagram caption, inject visual image preview
+      const isFigure = chunkData.content_type === "figure_caption" || chunkData.sub_type === "figure" || /^\s*FIGURE\s+[\d\.]+/i.test(chunkData.text || "");
+      if (isFigure) {
+        const passageBox = document.getElementById("drawer-passage-box");
+        if (passageBox && passageBox.parentElement) {
+          const figPreview = document.createElement("div");
+          figPreview.className = "bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs overflow-hidden mb-3";
+          figPreview.innerHTML = `
+            <div class="flex items-center justify-between text-[11px] font-bold text-slate-700 px-1 mb-1.5">
+              <span class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span>Textbook Figure Visual</span>
+              </span>
+              <button type="button" class="text-blue-600 hover:text-blue-800 text-[10px] font-semibold cursor-pointer flex items-center gap-0.5" onclick="openLightboxForChunk('${escapeHtml(cit.chunk_id)}')">
+                <span>Enlarge</span> &nearr;
+              </button>
+            </div>
+            <div class="relative bg-slate-950/5 rounded-lg overflow-hidden flex items-center justify-center p-1 min-h-[140px] cursor-zoom-in" onclick="openLightboxForChunk('${escapeHtml(cit.chunk_id)}')">
+              <img src="/api/figure/${encodeURIComponent(cit.chunk_id)}/image" alt="Citation Figure Preview" class="w-full max-h-60 object-contain rounded transition hover:scale-102" loading="lazy" onerror="this.parentElement.parentElement.remove();" />
+            </div>
+          `;
+          passageBox.parentElement.insertBefore(figPreview, passageBox);
+        }
       }
     }
   } catch (err) {

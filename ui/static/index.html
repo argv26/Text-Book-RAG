@@ -434,6 +434,41 @@
     </div>
   </div>
 
+  <!-- FIGURE LIGHTBOX MODAL -->
+  <div id="figure-lightbox-modal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-sm hidden transition-opacity duration-200" role="dialog" aria-modal="true" aria-labelledby="lightbox-title">
+    <div class="relative max-w-4xl w-full max-h-[92vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-700/40 animate-in fade-in zoom-in-95 duration-150">
+      
+      <!-- Top Bar -->
+      <div class="p-3 sm:p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/90">
+        <div class="flex items-center gap-2 overflow-hidden pr-2">
+          <svg class="w-4 h-4 text-blue-600 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+          <h3 id="lightbox-title" class="font-bold text-xs sm:text-sm text-slate-900 truncate">Textbook Diagram</h3>
+          <span id="lightbox-page-badge" class="text-[10px] font-mono text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full flex-shrink-0">p. 0</span>
+        </div>
+        <button id="btn-close-lightbox" class="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition cursor-pointer" aria-label="Close figure lightbox">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <line x1="18" y1="6" x2="6" y2="18" stroke-width="2" stroke-linecap="round"/>
+            <line x1="6" y1="6" x2="18" y2="18" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Image Area -->
+      <div class="flex-1 overflow-auto bg-slate-950 flex items-center justify-center p-2 sm:p-4 min-h-[300px]">
+        <img id="lightbox-img" src="" alt="Textbook Diagram Preview" class="max-w-full max-h-[65vh] object-contain rounded shadow-md" />
+      </div>
+
+      <!-- Caption Footer -->
+      <div class="p-3 sm:p-4 border-t border-slate-200 bg-slate-50 max-h-36 overflow-y-auto text-xs text-slate-600 leading-relaxed font-sans">
+        <p id="lightbox-caption" class="whitespace-pre-wrap"></p>
+      </div>
+    </div>
+  </div>
+
   <!-- App Script -->
   <script src="/static/app.js"></script>
 </body>
