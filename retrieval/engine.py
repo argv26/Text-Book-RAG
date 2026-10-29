@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sqlite3
+import threading
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
@@ -27,7 +28,13 @@ class BaseEngine(ABC):
     """Abstract base class for textbook retrieval engines."""
 
     @abstractmethod
-    def search_sections(self, query: str, book_slug: str | None = None, limit: int = 5) -> list[SectionHit]:
+    def search_sections(
+        self,
+        query: str,
+        book_slug: str | None = None,
+        allowed_books: list[str] | None = None,
+        limit: int = 5,
+    ) -> list[SectionHit]:
         pass
 
     @abstractmethod
@@ -37,6 +44,7 @@ class BaseEngine(ABC):
         book_slug: str | None = None,
         section_id: int | None = None,
         content_type: str | None = None,
+        allowed_books: list[str] | None = None,
         limit: int = 5,
     ) -> list[ChunkHit]:
         pass
@@ -67,14 +75,28 @@ class SqliteEngine(BaseEngine):
         self.db_path = Path(db_path)
         if not self.db_path.exists():
             raise FileNotFoundError(f"Database not found at {self.db_path}. Run ingestion/load_to_db.py first.")
-        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False, timeout=15.0)
-        self.conn.execute("PRAGMA journal_mode=WAL;")
-        self.conn.execute("PRAGMA synchronous=NORMAL;")
-        self._ensure_sections_fts()
+        self._local = threading.local()
+        init_conn = self._get_connection()
+        init_conn.execute("PRAGMA journal_mode=WAL;")
+        init_conn.execute("PRAGMA synchronous=NORMAL;")
+        self._ensure_sections_fts(init_conn)
 
-    def _ensure_sections_fts(self):
+    def _get_connection(self) -> sqlite3.Connection:
+        if not hasattr(self._local, "conn") or self._local.conn is None:
+            conn = sqlite3.connect(str(self.db_path), check_same_thread=False, timeout=15.0)
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+            self._local.conn = conn
+        return self._local.conn
+
+    @property
+    def conn(self) -> sqlite3.Connection:
+        return self._get_connection()
+
+    def _ensure_sections_fts(self, conn: sqlite3.Connection | None = None):
         """Ensures an FTS5 table exists for fast section heading queries."""
-        cur = self.conn.cursor()
+        c = conn or self.conn
+        cur = c.cursor()
         tables = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         if "sections_fts" not in tables:
             cur.executescript(
@@ -90,7 +112,7 @@ class SqliteEngine(BaseEngine):
                 SELECT id, book_slug, title, heading_path, coalesce(summary, '') FROM sections;
                 """
             )
-            self.conn.commit()
+            c.commit()
 
     STOP_WORDS = {
         "what", "is", "are", "the", "a", "an", "of", "and", "in", "to", "for", "with",
@@ -126,7 +148,16 @@ class SqliteEngine(BaseEngine):
         target = [self._correct_spelling(w) for w in (filtered if filtered else words)]
         return f" {operator} ".join(f'"{w}"' for w in target) if target else query
 
-    def search_sections(self, query: str, book_slug: str | None = None, limit: int = 5) -> list[SectionHit]:
+    def search_sections(
+        self,
+        query: str,
+        book_slug: str | None = None,
+        allowed_books: list[str] | None = None,
+        limit: int = 5,
+    ) -> list[SectionHit]:
+        if allowed_books is not None and len(allowed_books) == 0:
+            return []
+
         cur = self.conn.cursor()
         fts_q = self._clean_fts_query(query, operator="AND")
 
@@ -143,6 +174,10 @@ class SqliteEngine(BaseEngine):
         if book_slug:
             sql += " AND s.book_slug = ?"
             params.append(book_slug)
+        if allowed_books:
+            placeholders = ",".join("?" for _ in allowed_books)
+            sql += f" AND s.book_slug IN ({placeholders})"
+            params.extend(allowed_books)
         sql += " ORDER BY rank LIMIT ?"
         params.append(limit)
 
@@ -163,6 +198,10 @@ class SqliteEngine(BaseEngine):
             if book_slug:
                 sql_fallback += " AND book_slug = ?"
                 params_fallback.append(book_slug)
+            if allowed_books:
+                placeholders = ",".join("?" for _ in allowed_books)
+                sql_fallback += f" AND book_slug IN ({placeholders})"
+                params_fallback.extend(allowed_books)
             sql_fallback += " LIMIT ?"
             params_fallback.append(limit)
             rows = cur.execute(sql_fallback, params_fallback).fetchall()
@@ -189,8 +228,12 @@ class SqliteEngine(BaseEngine):
         book_slug: str | None = None,
         section_id: int | None = None,
         content_type: str | None = None,
+        allowed_books: list[str] | None = None,
         limit: int = 5,
     ) -> list[ChunkHit]:
+        if allowed_books is not None and len(allowed_books) == 0:
+            return []
+
         cur = self.conn.cursor()
         fts_q = self._clean_fts_query(query)
 
@@ -209,6 +252,10 @@ class SqliteEngine(BaseEngine):
         if book_slug:
             sql += " AND c.book_slug = ?"
             params.append(book_slug)
+        if allowed_books:
+            placeholders = ",".join("?" for _ in allowed_books)
+            sql += f" AND c.book_slug IN ({placeholders})"
+            params.extend(allowed_books)
         if section_id is not None:
             sql += " AND c.section_id = ?"
             params.append(section_id)
@@ -239,6 +286,10 @@ class SqliteEngine(BaseEngine):
             if book_slug:
                 sql_fallback += " AND c.book_slug = ?"
                 params_fallback.append(book_slug)
+            if allowed_books:
+                placeholders = ",".join("?" for _ in allowed_books)
+                sql_fallback += f" AND c.book_slug IN ({placeholders})"
+                params_fallback.extend(allowed_books)
             if section_id is not None:
                 sql_fallback += " AND c.section_id = ?"
                 params_fallback.append(section_id)
@@ -420,7 +471,16 @@ class PostgresEngine(BaseEngine):
         self.db_url = db_url
         self.conn = psycopg.connect(self.db_url, autocommit=True)
 
-    def search_sections(self, query: str, book_slug: str | None = None, limit: int = 5) -> list[SectionHit]:
+    def search_sections(
+        self,
+        query: str,
+        book_slug: str | None = None,
+        allowed_books: list[str] | None = None,
+        limit: int = 5,
+    ) -> list[SectionHit]:
+        if allowed_books is not None and len(allowed_books) == 0:
+            return []
+
         with self.conn.cursor() as cur:
             sql = """
                 SELECT
@@ -434,6 +494,9 @@ class PostgresEngine(BaseEngine):
             if book_slug:
                 sql += " AND book_slug = %s"
                 params.append(book_slug)
+            if allowed_books:
+                sql += " AND book_slug = ANY(%s)"
+                params.append(allowed_books)
             sql += " ORDER BY rank DESC LIMIT %s;"
             params.append(limit)
 
@@ -460,8 +523,12 @@ class PostgresEngine(BaseEngine):
         book_slug: str | None = None,
         section_id: int | None = None,
         content_type: str | None = None,
+        allowed_books: list[str] | None = None,
         limit: int = 5,
     ) -> list[ChunkHit]:
+        if allowed_books is not None and len(allowed_books) == 0:
+            return []
+
         with self.conn.cursor() as cur:
             sql = """
                 SELECT
@@ -478,6 +545,9 @@ class PostgresEngine(BaseEngine):
             if book_slug:
                 sql += " AND c.book_slug = %s"
                 params.append(book_slug)
+            if allowed_books:
+                sql += " AND c.book_slug = ANY(%s)"
+                params.append(allowed_books)
             if section_id is not None:
                 sql += " AND c.section_id = %s"
                 params.append(section_id)

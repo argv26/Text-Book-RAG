@@ -39,7 +39,8 @@ def _engine():
 def search_sections(
     query: str,
     book_slug: str | None = None,
-    limit: int = 5,
+    allowed_books: list[str] | None = None,
+    limit: int = 6,
 ) -> list[dict[str, Any]]:
     """Search textbook outline headings, titles, and section paths.
 
@@ -48,13 +49,19 @@ def search_sections(
 
     Args:
         query: Clinical topic or keyword (e.g., 'adrenal cortex', 'thyroiditis').
-        book_slug: Optional book identifier to restrict search.
+        book_slug: Optional single book identifier to restrict search.
+        allowed_books: Optional list of book identifiers to restrict search scope.
         limit: Maximum number of section nodes to return (default 5).
 
     Returns:
         List of section records containing section_id, title, heading_path, page_start, page_end.
     """
-    hits = _engine().search_sections(query=query, book_slug=book_slug, limit=limit)
+    hits = _engine().search_sections(
+        query=query,
+        book_slug=book_slug,
+        allowed_books=allowed_books,
+        limit=limit,
+    )
     return [h.to_dict() for h in hits]
 
 
@@ -63,7 +70,8 @@ def search_chunks(
     book_slug: str | None = None,
     section_id: int | None = None,
     content_type: str | None = None,
-    limit: int = 5,
+    allowed_books: list[str] | None = None,
+    limit: int = 6,
 ) -> list[dict[str, Any]]:
     """Search granular textbook passages, tables, and callout boxes.
 
@@ -72,9 +80,10 @@ def search_chunks(
 
     Args:
         query: Specific search terms (e.g., 'dexamethasone suppression test', 'Table 2.1').
-        book_slug: Optional book identifier.
+        book_slug: Optional single book identifier.
         section_id: Optional section ID to restrict search within a single section.
         content_type: Optional filter ('prose', 'table', 'box', 'figure_caption').
+        allowed_books: Optional list of book identifiers to restrict search scope.
         limit: Maximum number of chunks to return (default 5).
 
     Returns:
@@ -85,6 +94,34 @@ def search_chunks(
         book_slug=book_slug,
         section_id=section_id,
         content_type=content_type,
+        allowed_books=allowed_books,
+        limit=limit,
+    )
+    return [h.to_dict() for h in hits]
+
+
+def search_figures(
+    query: str,
+    book_slug: str | None = None,
+    allowed_books: list[str] | None = None,
+    limit: int = 4,
+) -> list[dict[str, Any]]:
+    """Search textbook figure captions, plates, and diagrams.
+
+    Args:
+        query: Specific medical keywords (e.g. 'blood pressure', 'thyroid synthesis', 'femoral triangle').
+        book_slug: Optional single book identifier to restrict search.
+        allowed_books: Optional list of book identifiers to restrict search scope.
+        limit: Maximum number of figures to return (default 4).
+
+    Returns:
+        List of figure caption chunks with printed page numbers and source details.
+    """
+    hits = _engine().search_chunks(
+        query=query,
+        book_slug=book_slug,
+        content_type="figure_caption",
+        allowed_books=allowed_books,
         limit=limit,
     )
     return [h.to_dict() for h in hits]
