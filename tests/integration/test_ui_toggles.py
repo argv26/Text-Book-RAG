@@ -48,6 +48,14 @@ def test_js_logic_structure():
     assert "active_books: Array.from(activeBooksSet)" in content, "Missing active_books in submitQuery payload"
     assert "role=\"switch\"" in content, "Missing role='switch' for accessibility"
 
+    # Validate JavaScript Syntax if node is available
+    import shutil
+    import subprocess
+    node_bin = shutil.which("node")
+    if node_bin:
+        res = subprocess.run([node_bin, "--check", str(js_path)], capture_output=True, text=True)
+        assert res.returncode == 0, f"app.js syntax error: {res.stderr}"
+
     print("[PASS] app.js contains all necessary scope toggle, persistence, and accessibility logic.", flush=True)
 
 

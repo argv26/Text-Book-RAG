@@ -1309,7 +1309,6 @@ function appendFiguresToWrapper(wrapper, figures) {
     });
   });
 }
-}
 
 function appendFollowUpsToWrapper(wrapper, followUps) {
   const container = wrapper.querySelector(".follow-ups-container");
