@@ -67,6 +67,49 @@ def _resolve_pdf_path(book_slug: str) -> Path | None:
     return candidates[0] if candidates else None
 
 
+def _generate_card_image(target_path: Path, book_slug: str, page_start: int | None, raw_text: str) -> Path | None:
+    """Generates a visual clinical reference card JPEG when raw PDF is absent."""
+    try:
+        import pymupdf
+    except ImportError:
+        try:
+            import fitz as pymupdf
+        except ImportError:
+            return None
+
+    try:
+        doc = pymupdf.open()
+        page = doc.new_page(width=720, height=480)
+        # Background & border
+        page.draw_rect(pymupdf.Rect(0, 0, 720, 480), color=(0.93, 0.95, 0.98), fill=(0.96, 0.98, 1.0))
+        page.draw_rect(pymupdf.Rect(20, 20, 700, 460), color=(0.82, 0.86, 0.92), fill=(1.0, 1.0, 1.0))
+        # Top banner
+        page.draw_rect(pymupdf.Rect(20, 20, 700, 80), color=(0.15, 0.35, 0.8), fill=(0.15, 0.35, 0.8))
+
+        clean_book = (book_slug or "Textbook").replace("_", " ").replace("-", " ").title()
+        page.insert_text((40, 56), f"CLINICAL TEXTBOOK REFERENCE  •  {clean_book}", fontsize=12, color=(1.0, 1.0, 1.0))
+
+        if page_start:
+            page.draw_rect(pymupdf.Rect(580, 36, 680, 66), color=(0.1, 0.25, 0.6), fill=(0.1, 0.25, 0.6))
+            page.insert_text((600, 56), f"Page {page_start}", fontsize=12, color=(1.0, 1.0, 1.0))
+
+        match = re.search(r"\b(FIGURE\s+[\d\.]+[A-Za-z]?|Fig\.\s*[\d\.]+)\b", raw_text, re.IGNORECASE)
+        fig_title = match.group(0).upper() if match else "TEXTBOOK FIGURE & DIAGRAM"
+        page.insert_text((40, 120), fig_title, fontsize=18, color=(0.12, 0.18, 0.3))
+
+        clean_text = re.sub(r"(\w+)-\s*\n\s*(\w+)", r"\1\2", raw_text)
+        clean_text = re.sub(r"\s+", " ", clean_text).strip()
+        page.insert_textbox(pymupdf.Rect(40, 140, 680, 430), clean_text, fontsize=12, color=(0.25, 0.3, 0.38))
+
+        pix = page.get_pixmap(dpi=130)
+        pix.save(str(target_path), "jpeg", jpg_quality=85)
+        doc.close()
+        return target_path
+    except Exception as e:
+        print(f"[ui.diagrams] Card fallback error: {e}")
+        return None
+
+
 def get_figure_image_path(chunk_id: str) -> Path | None:
     """Resolves or generates a cached JPEG image for a textbook figure chunk.
 
@@ -100,7 +143,7 @@ def get_figure_image_path(chunk_id: str) -> Path | None:
 
     pdf_path = _resolve_pdf_path(book_slug)
     if not pdf_path or not pdf_path.exists():
-        return None
+        return _generate_card_image(target_cache_file, book_slug, page_start, raw_text)
 
     try:
         import pymupdf
@@ -108,7 +151,7 @@ def get_figure_image_path(chunk_id: str) -> Path | None:
         try:
             import fitz as pymupdf
         except ImportError:
-            return None
+            return _generate_card_image(target_cache_file, book_slug, page_start, raw_text)
 
     # Convert printed page number to 0-based PDF page index
     pm = _get_page_map(book_slug)
