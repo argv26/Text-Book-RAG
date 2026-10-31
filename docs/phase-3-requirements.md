@@ -1,4 +1,4 @@
-# Phase 3 Requirements: Multi-Book Scaling, Dynamic Ingestion & UI Book Routing
+ok tak# Phase 3 Requirements: Multi-Book Scaling, Dynamic Ingestion & UI Book Routing
 
 ## 1. Executive Summary & Scaling Motivation
 
@@ -166,6 +166,7 @@ CREATE TABLE IF NOT EXISTS ingestion_jobs (
 ---
 
 ## 5. Phased Implementation Roadmap
+For the granular, step-by-step task prompts and manual verification protocols, see the [Phase 3 Implementation Plan](file:///c:/Users/govin/Desktop/projects/Text-Book-RAG/docs/phase-3-implementation-plan.md).
 
 | Milestone | Scope & Deliverables | Verification Criteria |
 | :--- | :--- | :--- |
