@@ -67,6 +67,44 @@ Scaling to 50 textbooks introduces three fundamental architectural bottlenecks t
 
 ---
 
+### FR-6: Pre-Step Clinical Planning & Reasoning Orchestration (`AttendingPlanner`)
+* **Beyond Reactive Tool-Calling**: Standard single-turn ReAct often jumps prematurely into search without understanding clinical scope. Phase 3 implements an explicit **Pre-Step Clinical Planner** (`AttendingPlanner`) that runs before retrieval:
+  1. *Deconstruction*: Analyzes the patient/clinical inquiry into underlying pathophysiology, diagnostic criteria, or pharmacological targets.
+  2. *Targeted Formulation*: Determines the exact target books, sections, and search hypotheses needed.
+  3. *Evidence Checklist*: Formulates acceptance criteria the retrieved evidence must satisfy before drafting the answer.
+* **Role Taxonomy & Clinical Hierarchy Naming**:
+  - **`AttendingPlanner`**: Formulates diagnostic reasoning strategy, selects target volumes, and generates search plan.
+  - **`ConsultantRetriever`**: Executes parallel structure-aware searches (`search_sections`, `search_chunks`, `read_section`).
+  - **`DifferentialSynthesizer`**: Compiles the final grounded clinical consensus with verified citations.
+
+---
+
+### FR-7: Deterministic Prompt Caching Architecture
+* **Static Prefix Isolation**: Structure the prompt layout so that invariant system instructions, clinical persona, guidelines, and textbook catalog metadata reside at the **head** of the prompt.
+* **Dynamic Suffix Appending**: Dynamic user messages, retrieved section context, and tool outputs are appended strictly at the **tail**.
+* **Provider Cache Optimization**: Maximizes prompt-caching hit rates (e.g., Google Gemini context caching, Anthropic prompt caching), slashing Time-To-First-Token (TTFT) by 3–4x and lowering per-query token costs by up to 80%.
+
+---
+
+### FR-8: Cross-Textbook Discrepancy & Contrarian Opinion Resolution
+* **Handling Textbook Disagreements**: In a 50-book library, textbooks will inevitably provide conflicting data (e.g., differing diagnostic cutoffs, conflicting classification schemes, or updated pharmacological lines of therapy).
+* **Clinical Hierarchy of Evidence**:
+  1. *Subspecialty Authority*: Subspecialty gold-standard volumes (e.g., *Williams Endocrinology*) supersede generalist texts (e.g., *Anatomy & Physiology*) on specialized pathophysiological nuances.
+  2. *Recency & Professional Society Consensus*: Newer textbook editions and updated guidelines supersede historical editions.
+  3. *Variant Recognition*: Anatomical or physiological variations must be presented as documented clinical variants rather than contradictions.
+* **Anti-Hallucination & Discrepancy Transparency**: The model must **never invent a compromise** between conflicting sources. It must explicitly highlight the discrepancy:
+  > *"Note: Textbook sources present differing criteria on this threshold. According to Williams Endocrinology (p. 604)... whereas Anatomy & Physiology (p. 712) states... In clinical practice, the subspecialty guideline is typically prioritized."*
+
+---
+
+### FR-9: Domain-Expert Evaluation & Credibility Rubric
+* **Grounding Fidelity (1–5)**: Every medical assertion must be strictly supported by an exact section/page citation.
+* **Nuance & Discrepancy Detection (1–5)**: Does the system accurately recognize and surface conflicting opinions between textbooks?
+* **Absence of Extrapolation (1–5)**: Does the system refuse to fabricate facts outside the indexed source material?
+* For full questionnaire and clinician interview protocol, see [Physician Domain-Expert Questionnaire](file:///c:/Users/govin/Desktop/projects/Text-Book-RAG/docs/physician-questionnaire.md).
+
+---
+
 ## 3. Architecture & Data Flow
 
 ```mermaid
