@@ -132,3 +132,9 @@ Text-Book-RAG/
    - Raw LaTeX tags (e.g. `\text{...}`) and hormone math delimiters (`$T4$`, `$TR\beta2$`) are sanitized into clean Unicode.
    - Out-of-catalog bracketed references (e.g. `[14]` copied from textbook bibliographies) are converted to plaintext `(Ref 14)` so only registered citations become clickable pills.
 
+---
+
+## 6. Multi-Book Scaling & Phase 3 Roadmap
+For specifications on scaling from 2 to 50 textbooks, semantic book routing, dynamic textbook ingestion, and decoupled cloud media storage, see [Phase 3 Requirements](file:///c:/Users/govin/Desktop/projects/Text-Book-RAG/docs/phase-3-requirements.md).
+
+
